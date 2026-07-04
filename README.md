@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mavixy — AI Lead Qualification & Outreach Platform (POC)
 
-## Getting Started
+**Turn cold outbound into personalized, intent-aware conversations that generate warm
+opportunities — automatically.**
 
-First, run the development server:
+This is the demo-ready proof of concept covering the full POC scope from the execution plan:
+
+| POC feature | Status |
+|---|---|
+| User authentication (signup / login / organization) | ✅ |
+| Lead import from CSV (column mapping, validation, dedup) | ✅ |
+| AI lead search from a plain-English ICP prompt | ✅ |
+| AI enrichment + prospect intelligence cards | ✅ |
+| AI-generated personalized 3-touch email sequences | ✅ |
+| Email campaigns that actually send (Resend) with open tracking | ✅ |
+| Intent scoring of replies (0–100, Cold/Warm/Hot/Sales Ready) | ✅ |
+| Dashboard: sends, opens, replies, intent pipeline, live activity | ✅ |
+| Credit wallet: deduction per action + transaction log | ✅ |
+
+## The zero-budget trick: Demo Mode
+
+The app runs perfectly with **no API keys and no spend**. Every AI/email engine has two
+implementations behind one interface:
+
+- **Demo engine (default)** — built-in intelligence generates enrichment cards, personalized
+  sequences and intent scores; email sends are simulated with realistic opens & replies that
+  stream in live during a demo. Deterministic, free, never breaks mid-pitch.
+- **Live engine** — set an environment variable and that engine flips to the real thing.
+  No code changes.
+
+| Env var | What goes live |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude writes enrichment, sequences, intent scores |
+| `RESEND_API_KEY` | Emails really send, opens tracked via pixel |
+| `APOLLO_API_KEY` | AI search pulls real prospects from Apollo.io |
+
+The header badges always show which mode each engine is in — honest for demos.
+
+## Deploying (no coding needed)
+
+Follow **[SETUP.md](./SETUP.md)** — a step-by-step guide to put this live on Supabase (free
+database) + Vercel (free hosting) in about 15 minutes, written for non-developers.
+
+## Running locally (for developers)
 
 ```bash
+npm install
+# point DATABASE_URL at any Postgres — tables are created automatically on first request
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/qualgen \
+SESSION_SECRET=dev-secret \
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Architecture
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Next.js 15 (App Router) + Tailwind CSS** — UI and API routes in one deployable unit
+- **Postgres** (Supabase) — schema auto-migrates on boot (`lib/db.ts`)
+- **Cookie-session auth** (JWT via `jose`, bcrypt password hashing) — `lib/auth.ts`
+- **Credit wallet** with atomic deductions and a full ledger — `lib/credits.ts`
+- **AI layer** with Claude + deterministic fallback — `lib/ai.ts`, `lib/demo.ts`
+- **Outreach engine** — scheduled sends, open pixel, reply capture, intent scoring —
+  `lib/process.ts`, polled by the app shell every 15s while the dashboard is open
+- **Sample workspace seeder** for instant demos — `lib/seed.ts`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Credit costs (as per the plan)
 
-## Learn More
+| Action | Credits |
+|---|---|
+| Lead discovery (AI search) | 1 / lead |
+| AI enrichment | 3 / lead |
+| AI sequence generation | 3 / lead |
+| Email send | 1 / email |
+| Intent scoring | 1 / reply |
+| CSV import | free |
 
-To learn more about Next.js, take a look at the following resources:
+New workspaces start with **500 free credits**.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What's next (MVP phase)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Stripe credit purchases · team invites & roles · conditional sequence branching · admin
+panel · click/bounce tracking · low-credit alerts — see the execution plan.
