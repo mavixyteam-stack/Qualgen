@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
@@ -20,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geistSans.variable}>
-      <body style={{ fontFamily: "var(--font-geist-sans), system-ui, sans-serif" }}>
+    <html lang="en" className={manrope.variable}>
+      <body style={{ fontFamily: "var(--font-sans), system-ui, sans-serif" }}>
         {children}
       </body>
     </html>
