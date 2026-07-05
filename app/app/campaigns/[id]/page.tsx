@@ -16,20 +16,19 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   if (!campaigns.length) notFound();
   const c = campaigns[0];
 
-  const messages = await sql`
-    select m.id, m.lead_id, m.step, m.subject, m.body, m.status, m.scheduled_at, m.sent_at, m.opened_at, m.replied_at,
+  const [messages, replies] = await Promise.all([
+    sql`select m.id, m.lead_id, m.step, m.subject, m.body, m.status, m.scheduled_at, m.sent_at, m.opened_at, m.replied_at,
            l.name as lead_name, l.title as lead_title, l.company as lead_company,
            l.intent_score, l.intent_label
-    from messages m join leads l on l.id = m.lead_id
-    where m.campaign_id = ${id}
-    order by l.name, m.step`;
-
-  const replies = await sql`
-    select r.id, r.lead_id, r.body, r.intent_score, r.intent_label, r.reasoning, r.created_at,
+        from messages m join leads l on l.id = m.lead_id
+        where m.campaign_id = ${id}
+        order by l.name, m.step`,
+    sql`select r.id, r.lead_id, r.body, r.intent_score, r.intent_label, r.reasoning, r.created_at,
            l.name as lead_name, l.company as lead_company
-    from replies r join leads l on l.id = r.lead_id
-    where r.campaign_id = ${id}
-    order by r.created_at desc`;
+        from replies r join leads l on l.id = r.lead_id
+        where r.campaign_id = ${id}
+        order by r.created_at desc`,
+  ]);
 
   const data: CampaignData = {
     id: c.id,

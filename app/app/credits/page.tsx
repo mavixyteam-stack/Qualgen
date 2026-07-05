@@ -38,17 +38,16 @@ export default async function CreditsPage() {
   if (!user) redirect("/login");
   await ensureSchema();
 
-  const usage = await sql`
-    select action, sum(-delta)::int as spent
-    from credit_transactions
-    where org_id = ${user.orgId} and delta < 0
-    group by action order by spent desc`;
-
-  const transactions = await sql`
-    select delta, balance_after, action, description, created_at
-    from credit_transactions
-    where org_id = ${user.orgId}
-    order by created_at desc limit 40`;
+  const [usage, transactions] = await Promise.all([
+    sql`select action, sum(-delta)::int as spent
+        from credit_transactions
+        where org_id = ${user.orgId} and delta < 0
+        group by action order by spent desc`,
+    sql`select delta, balance_after, action, description, created_at
+        from credit_transactions
+        where org_id = ${user.orgId}
+        order by created_at desc limit 40`,
+  ]);
 
   const totalSpent = usage.reduce((s, u) => s + u.spent, 0);
 

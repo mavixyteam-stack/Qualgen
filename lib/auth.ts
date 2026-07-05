@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
@@ -60,7 +61,8 @@ export type CurrentUser = {
   demoSeeded: boolean;
 };
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+/** Cached per request — layout and page share one DB hit instead of two. */
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await getSession();
   if (!session) return null;
   await ensureSchema();
@@ -80,7 +82,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     credits: r.credits,
     demoSeeded: r.demo_seeded,
   };
-}
+});
 
 /** For route handlers: returns the session or a thrown 401 Response. */
 export async function requireApiSession(): Promise<Session> {
