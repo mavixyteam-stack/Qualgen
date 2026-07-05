@@ -21,7 +21,6 @@ export async function seedSampleWorkspace(orgId: string, seederName: string) {
   const org = await sql`select demo_seeded from orgs where id = ${orgId}`;
   if (!org.length || org[0].demo_seeded) return { seeded: false };
 
-  const rng = seededRng(orgId);
   const now = Date.now();
   let spent = 0;
   const tx: { delta: number; action: string; description: string; at: Date }[] = [];

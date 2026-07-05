@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  IconChart, IconCoin, IconGear, IconGrid, IconLogout, IconRocket, IconSearch, IconTarget,
+  IconCoin, IconGear, IconGrid, IconLogout, IconRocket, IconSearch, IconTarget,
 } from "./Icons";
 
 const LINKS = [

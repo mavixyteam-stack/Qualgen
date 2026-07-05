@@ -95,7 +95,7 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
           fromName: m.sender_name || "Mavixy",
         });
         await sql`update messages set status = 'sent', sent_at = ${now}, provider_id = ${providerId} where id = ${m.id}`;
-      } catch (err) {
+      } catch {
         // Never charge for an email that didn't go out.
         await addCredits(orgId, COSTS.email_send, "refund", `Auto-refund — email to ${m.lead_name} failed to send`);
         await sql`update messages set status = 'failed' where id = ${m.id}`;
