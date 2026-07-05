@@ -6,9 +6,10 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { Enrichment, Icp, IntentResult, LeadInput, SequenceStep } from "./types";
+import type { CoachCard, Enrichment, Icp, IntentResult, LeadInput, SequenceStep } from "./types";
 import {
   enrichLeadDemo,
+  generateCoachDemo,
   generateSequenceDemo,
   intentLabel,
   parseIcpHeuristic,
@@ -121,6 +122,35 @@ Return JSON: {"steps": [{"step": 1, "subject": string, "body": string}, {"step":
     }
   }
   return { steps: generateSequenceDemo(lead, enrichment, campaign), engine: "demo" };
+}
+
+/* ------------------------------- Sales Coach ------------------------------- */
+
+export async function generateCoach(
+  lead: LeadInput & { id?: string; intent_score?: number | null; intent_label?: string | null },
+  enrichment: Enrichment | null,
+  replies: string[]
+): Promise<{ coach: CoachCard; engine: "ai" | "demo" }> {
+  const lastReply = replies.length ? replies[replies.length - 1] : null;
+  if (aiLive()) {
+    try {
+      const coach = await claudeJson<CoachCard>(
+        `You are Mavixy AI's sales coach. Given a lead's profile, intelligence card and their reply history, write a closing playbook for the human salesperson about to engage them.
+Be concrete and tactical — coach for THIS buyer, not generic sales advice. Ground everything in their actual replies and profile.
+Return JSON: {"dealSummary": string (2-3 sentences, where this deal stands and why it's winnable), "wantToHear": string[3] (what this buyer needs to hear to move), "objections": [{"objection": string, "answer": string}] (max 2, from their actual replies), "openingLine": string (the exact line to open the call/reply with, in quotes), "nextAction": string (one concrete next move with timing), "styleTip": string (how to talk to this person)}`,
+        JSON.stringify({ lead, intelligence: enrichment, replies, intentScore: lead.intent_score, intentLabel: lead.intent_label }),
+        1400
+      );
+      if (coach.dealSummary && coach.openingLine && coach.nextAction) {
+        coach.wantToHear = coach.wantToHear?.slice(0, 3) ?? [];
+        coach.objections = coach.objections?.slice(0, 2) ?? [];
+        return { coach, engine: "ai" };
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return { coach: generateCoachDemo(lead, enrichment, lastReply), engine: "demo" };
 }
 
 /* ------------------------------ Intent scoring ----------------------------- */

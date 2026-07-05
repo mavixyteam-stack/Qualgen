@@ -12,6 +12,7 @@ const ACTION_META: Record<string, { name: string; emoji: string }> = {
   personalize: { name: "AI sequences", emoji: "✍️" },
   email_send: { name: "Emails sent", emoji: "📤" },
   intent_score: { name: "Intent scoring", emoji: "🌡️" },
+  coach: { name: "Closing playbooks", emoji: "🏆" },
   signup_bonus: { name: "Welcome bonus", emoji: "🎁" },
   poc_topup: { name: "Demo top-up", emoji: "⚡" },
 };
@@ -22,6 +23,7 @@ const RATE_CARD = [
   { action: "AI sequence generation", cost: "3 credits / lead" },
   { action: "Email send", cost: "1 credit / email" },
   { action: "Intent scoring", cost: "1 credit / reply" },
+  { action: "Closing playbook (Sales Coach)", cost: "2 credits / lead" },
   { action: "CSV import", cost: "Free" },
 ];
 

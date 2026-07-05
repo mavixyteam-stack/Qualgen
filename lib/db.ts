@@ -62,6 +62,8 @@ create table if not exists leads (
   created_at timestamptz not null default now()
 );
 create index if not exists leads_org_idx on leads(org_id, created_at desc);
+alter table leads add column if not exists coach jsonb;
+alter table leads add column if not exists coach_at timestamptz;
 
 create table if not exists campaigns (
   id uuid primary key default gen_random_uuid(),

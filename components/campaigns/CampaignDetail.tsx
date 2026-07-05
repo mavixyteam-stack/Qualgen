@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IntentBadge, Modal, Spinner, StatusChip } from "@/components/ui";
+import { CoachDrawer, type CoachLead } from "@/components/coach/CoachDrawer";
 
 export type CampaignData = {
   id: string;
@@ -54,6 +55,7 @@ export function CampaignDetail({ data }: { data: CampaignData }) {
   const [openLead, setOpenLead] = useState<string | null>(null);
   const [openMessage, setOpenMessage] = useState<CampaignData["messages"][number] | null>(null);
   const [replyFor, setReplyFor] = useState<{ id: string; name: string } | null>(null);
+  const [coachLead, setCoachLead] = useState<CoachLead | null>(null);
   const [replyText, setReplyText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,12 +176,28 @@ export function CampaignDetail({ data }: { data: CampaignData }) {
                           </li>
                         ))}
                       </ol>
-                      <button
-                        onClick={() => setReplyFor({ id: leadId, name: lead.leadName })}
-                        className="btn-ghost btn-md mt-3 text-xs"
-                      >
-                        💬 Log a reply manually
-                      </button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {lead.intentLabel && (
+                          <button
+                            onClick={() =>
+                              setCoachLead({
+                                id: leadId, name: lead.leadName, title: lead.leadTitle,
+                                company: lead.leadCompany, intent_score: lead.intentScore,
+                                intent_label: lead.intentLabel,
+                              })
+                            }
+                            className="btn-primary btn-sm"
+                          >
+                            🏆 Closing playbook
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setReplyFor({ id: leadId, name: lead.leadName })}
+                          className="btn-ghost btn-sm text-xs"
+                        >
+                          💬 Log a reply
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -241,6 +259,8 @@ export function CampaignDetail({ data }: { data: CampaignData }) {
           </div>
         )}
       </Modal>
+
+      <CoachDrawer lead={coachLead} onClose={() => setCoachLead(null)} />
 
       {/* log reply modal */}
       <Modal

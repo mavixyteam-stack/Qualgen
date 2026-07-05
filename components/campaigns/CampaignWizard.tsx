@@ -22,12 +22,19 @@ const GOALS = [
   "Schedule a discovery call",
 ];
 
+const CHANNELS = [
+  { key: "email", name: "Email", emoji: "📧", live: true, note: "Tracked opens & replies" },
+  { key: "linkedin", name: "LinkedIn", emoji: "💼", live: false, note: "Coming in Phase 2" },
+  { key: "whatsapp", name: "WhatsApp", emoji: "💬", live: false, note: "Coming in Phase 2" },
+];
+
 export function CampaignWizard({ leads }: { leads: WizardLead[] }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState(GOALS[0]);
   const [product, setProduct] = useState("");
+  const [channels, setChannels] = useState<Set<string>>(new Set(["email"]));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -159,6 +166,45 @@ export function CampaignWizard({ leads }: { leads: WizardLead[] }) {
               onChange={(e) => setProduct(e.target.value)}
               placeholder="One line about your product — the AI uses this to write sharper emails" />
           </div>
+          <div>
+            <span className="label">Channels</span>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {CHANNELS.map((c) => {
+                const selected = channels.has(c.key);
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    disabled={!c.live}
+                    onClick={() =>
+                      setChannels((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(c.key)) { if (next.size > 1) next.delete(c.key); }
+                        else next.add(c.key);
+                        return next;
+                      })
+                    }
+                    className={`rounded-2xl border-2 p-4 text-left transition-all duration-200 ${
+                      selected
+                        ? "border-brand-400 bg-brand-50 shadow-soft"
+                        : "border-ink/10 bg-white hover:border-brand-200"
+                    } ${!c.live ? "opacity-55 cursor-not-allowed" : "active:scale-[.98]"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl">{c.emoji}</span>
+                      {c.live ? (
+                        selected && <span className="chip bg-brand-500 text-white">✓ On</span>
+                      ) : (
+                        <span className="chip bg-pastel-lemon text-accent-lemon">Soon</span>
+                      )}
+                    </div>
+                    <div className="mt-2 text-sm font-extrabold">{c.name}</div>
+                    <div className="text-xs text-ink-muted">{c.note}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex justify-end">
             <button
               onClick={() => name.trim() ? setStep(1) : setError("Give your campaign a name.")}
@@ -242,11 +288,11 @@ export function CampaignWizard({ leads }: { leads: WizardLead[] }) {
       {/* Step 2 — generating */}
       {step === 2 && (
         <div className="card mt-6 flex flex-col items-center gap-5 p-12 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-pastel-lavender text-3xl">✍️</div>
+          <div className="float-slow flex h-16 w-16 items-center justify-center rounded-3xl bg-pastel-lavender text-3xl">✍️</div>
           <div>
-            <h2 className="text-xl font-bold">AI is writing personalized sequences…</h2>
+            <h2 className="text-xl font-extrabold">The AI is doing its homework…</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              3 touches per lead, written from each prospect&apos;s intelligence card
+              Three personal touches per buyer — written from their world, not a template.
             </p>
           </div>
           <div className="w-full max-w-sm">

@@ -38,8 +38,8 @@ export default async function CampaignsPage() {
         <div className="mt-8">
           <EmptyState
             emoji="🚀"
-            title="No campaigns yet"
-            body="Pick your leads, let AI write a personalized 3-touch sequence for each one, and launch."
+            title="Ready for liftoff?"
+            body="Pick your buyers, watch the AI write outreach that actually sounds human, hit launch — then enjoy the replies. First one takes about 3 minutes."
           >
             <Link href="/app/campaigns/new" className="btn-primary btn-md">Create your first campaign</Link>
           </EmptyState>

@@ -7,6 +7,7 @@ export const COSTS = {
   personalize: 3, // per lead sequence generated
   email_send: 1, // per email sent
   intent_score: 1, // per reply scored
+  coach: 2, // per AI sales-coach playbook
 } as const;
 
 export const SIGNUP_CREDITS = 500;

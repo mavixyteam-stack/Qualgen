@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { IntentBadge, Spinner, StatusChip } from "@/components/ui";
 import type { LeadRow } from "./lead-types";
 
-export function LeadDrawer({ lead, onClose }: { lead: LeadRow | null; onClose: () => void }) {
+export function LeadDrawer({
+  lead,
+  onClose,
+  onCoach,
+}: {
+  lead: LeadRow | null;
+  onClose: () => void;
+  onCoach: (lead: LeadRow) => void;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +42,7 @@ export function LeadDrawer({ lead, onClose }: { lead: LeadRow | null; onClose: (
   return (
     <div className="fixed inset-0 z-40">
       <div className="absolute inset-0 bg-ink/20 backdrop-blur-[2px]" onClick={onClose} />
-      <aside className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col overflow-y-auto bg-white shadow-lift">
+      <aside className="slide-in absolute inset-y-3 right-3 flex w-full max-w-xl flex-col overflow-y-auto rounded-3xl bg-white shadow-lift">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-ink/5 bg-white/90 px-7 py-5 backdrop-blur">
           <div>
             <h2 className="text-xl font-extrabold tracking-tight">{lead.name}</h2>
@@ -53,6 +61,11 @@ export function LeadDrawer({ lead, onClose }: { lead: LeadRow | null; onClose: (
           <div className="flex flex-wrap items-center gap-2">
             <StatusChip status={lead.status} />
             <IntentBadge label={lead.intent_label} score={lead.intent_score} />
+            {lead.intent_label && (
+              <button onClick={() => onCoach(lead)} className="btn-primary btn-sm ml-auto">
+                🏆 Closing playbook
+              </button>
+            )}
           </div>
 
           <dl className="grid grid-cols-2 gap-4 text-sm">

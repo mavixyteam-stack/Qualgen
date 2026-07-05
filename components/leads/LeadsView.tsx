@@ -6,6 +6,7 @@ import { EmptyState, IntentBadge, ProgressBar, Spinner, StatusChip } from "@/com
 import { ImportModal } from "./ImportModal";
 import { SearchModal } from "./SearchModal";
 import { LeadDrawer } from "./LeadDrawer";
+import { CoachDrawer, type CoachLead } from "@/components/coach/CoachDrawer";
 import type { LeadRow } from "./lead-types";
 
 const SOURCE_NAMES: Record<string, string> = {
@@ -21,6 +22,7 @@ export function LeadsView({ leads }: { leads: LeadRow[] }) {
   const [importOpen, setImportOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [drawerId, setDrawerId] = useState<string | null>(null);
+  const [coachLead, setCoachLead] = useState<CoachLead | null>(null);
   const [enriching, setEnriching] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,11 +100,13 @@ export function LeadsView({ leads }: { leads: LeadRow[] }) {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">Leads</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            {leads.length} lead{leads.length === 1 ? "" : "s"} in your database
+            {leads.length > 0
+              ? <><span className="font-bold text-ink">{leads.length}</span> future customer{leads.length === 1 ? "" : "s"} and counting 🎯</>
+              : "Your future customers will live here."}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -139,8 +143,8 @@ export function LeadsView({ leads }: { leads: LeadRow[] }) {
         <div className="mt-8">
           <EmptyState
             emoji="🎯"
-            title="No leads yet"
-            body="Find your ideal prospects with an AI search, or import a CSV of leads you already have."
+            title="Zero leads. Infinite potential."
+            body="Describe your dream customer in one sentence and watch the AI go hunting — or bring your own CSV. Either way, this table won't stay empty long."
           >
             <button onClick={() => setSearchOpen(true)} className="btn-primary btn-md">
               ✨ Find leads with AI
@@ -172,7 +176,7 @@ export function LeadsView({ leads }: { leads: LeadRow[] }) {
             )}
           </div>
 
-          <div className="card mt-4 overflow-x-auto">
+          <div className="card rise rise-2 mt-4 overflow-x-auto">
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
                 <tr className="border-b border-ink/5 text-xs uppercase tracking-wider text-ink-muted">
@@ -246,7 +250,12 @@ export function LeadsView({ leads }: { leads: LeadRow[] }) {
 
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <LeadDrawer lead={drawerLead} onClose={() => setDrawerId(null)} />
+      <LeadDrawer
+        lead={drawerLead}
+        onClose={() => setDrawerId(null)}
+        onCoach={(l) => { setDrawerId(null); setCoachLead(l); }}
+      />
+      <CoachDrawer lead={coachLead} onClose={() => setCoachLead(null)} />
     </div>
   );
 }

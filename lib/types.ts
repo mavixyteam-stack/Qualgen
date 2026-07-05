@@ -32,6 +32,15 @@ export type SequenceStep = {
   body: string;
 };
 
+export type CoachCard = {
+  dealSummary: string;
+  wantToHear: string[];
+  objections: { objection: string; answer: string }[];
+  openingLine: string;
+  nextAction: string;
+  styleTip: string;
+};
+
 export type IntentResult = {
   score: number; // 0-100
   label: "cold" | "warm" | "hot" | "ready";

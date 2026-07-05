@@ -4,7 +4,7 @@
  * demos are stable, but varied across leads so they feel real.
  */
 
-import type { Enrichment, Icp, IntentResult, LeadInput, SequenceStep } from "./types";
+import type { CoachCard, Enrichment, Icp, IntentResult, LeadInput, SequenceStep } from "./types";
 
 /* ---------------------------------- RNG ---------------------------------- */
 
@@ -389,4 +389,86 @@ export function intentLabel(score: number): "cold" | "warm" | "hot" | "ready" {
   if (score >= 61) return "hot";
   if (score >= 31) return "warm";
   return "cold";
+}
+
+/* ------------------------------ Sales Coach ------------------------------ */
+
+export function generateCoachDemo(
+  lead: LeadInput & { id?: string; intent_score?: number | null; intent_label?: string | null },
+  enrichment: Enrichment | null,
+  lastReply: string | null
+): CoachCard {
+  const rng = seededRng((lead.id || lead.name) + "coach");
+  const firstName = lead.name.split(" ")[0];
+  const company = lead.company || "their company";
+  const reply = (lastReply || "").toLowerCase();
+  const pain = enrichment?.painPoints?.[0] || "making outbound efficient without adding headcount";
+  const style = enrichment?.style || "Direct and to-the-point — one clear ask per message";
+
+  const askedPricing = /pric|how much|cost|budget/.test(reply);
+  const askedProof = /demo|deck|video|case|different|compare|apollo|instantly|evaluat/.test(reply);
+  const askedTiming = /quarter|later|busy|not right now|next/.test(reply);
+  const askedIntegration = /integrat|hubspot|crm|onboard|setup/.test(reply);
+  const askedMeeting = /set up a call|book|meeting|talk this week|call this week|schedule/.test(reply);
+
+  const objections: { objection: string; answer: string }[] = [];
+  if (askedPricing) objections.push({
+    objection: "Price sensitivity — they asked about cost before value was anchored",
+    answer: `Anchor on outcome first: "teams like ${company} typically recover the cost with one closed deal." Then share the pack that fits their team size — never lead with the number.`,
+  });
+  if (askedProof) objections.push({
+    objection: "Comparison shopping — they're evaluating against tools they know",
+    answer: "Don't feature-battle. Position the difference: others stop at sending; we qualify intent and coach the close. Offer a 10-minute live walkthrough with their own leads.",
+  });
+  if (askedTiming) objections.push({
+    objection: "Timing deflection — interested but protecting their calendar",
+    answer: `Make it small: "totally get it — want me to send a 3-minute video now and a calendar link for early next quarter?" Keep the thread warm, don't push the meeting.`,
+  });
+  if (askedIntegration) objections.push({
+    objection: "Setup anxiety — they've been burned by long onboardings",
+    answer: `Lead with speed: first campaign live in under 15 minutes, no engineering needed. Offer to set it up together on the call.`,
+  });
+  if (!objections.length) objections.push({
+    objection: "No explicit objection yet — the risk is losing momentum",
+    answer: "Reply within the hour while interest is warm. Ask one concrete question about their current outbound process to open the conversation.",
+  });
+
+  const summary = lastReply
+    ? `${firstName} at ${company} replied and is showing real interest${askedMeeting ? " — they asked for a call, which means the deal is theirs to lose, not yours to chase" : askedPricing ? " — they asked about pricing, which is a buying move, not a brush-off" : ""}${askedTiming ? " — timing is the friction, not desire" : ""}. Likely dealing with ${pain.toLowerCase()}. This conversation is winnable with a fast, specific follow-up.`
+    : `${firstName} at ${company} hasn't replied yet, but their profile suggests ${pain.toLowerCase()}. The next touch should lead with their world, not our product.`;
+
+  const wantToHear = [
+    askedPricing
+      ? "A clear, confident price anchored to an outcome — not a menu of plans"
+      : "Proof this saves their team real hours in week one",
+    `Something specific to ${company} — reference their space and stage, never generic praise`,
+    pick(rng, [
+      "That setup is instant and risk-free (free credits, no card)",
+      "A number: what similar teams saw in reply-rate lift",
+      "That they'll stay in control — AI drafts, humans approve",
+    ]),
+  ];
+
+  const openingLine = lastReply
+    ? pick(rng, [
+        `"Great question — before numbers, can I ask how many deals ${company} loses to slow follow-up today?"`,
+        `"Short answer: yes. Longer answer — worth 10 minutes with your own leads on screen?"`,
+        `"Appreciate the reply! One question first: what does a good month of pipeline look like for ${company}?"`,
+      ])
+    : pick(rng, [
+        `"Saw what ${company} is building — one idea specific to your outbound that takes 30 seconds to explain."`,
+        `"Most ${lead.industry || "B2B"} teams your size lose 20 hours a week to prospecting — is that true at ${company}?"`,
+      ]);
+
+  const nextAction = askedMeeting
+    ? "They asked for the call — reply within the hour with two concrete time slots (not a calendar link alone). Confirm today, meet this week."
+    : askedPricing
+    ? "Send pricing WITH a 15-minute call slot in the same message — pricing alone closes threads, pricing + conversation opens them."
+    : askedProof
+    ? "Send a 3-minute personalized demo video (their leads on screen) and offer a live walkthrough this week."
+    : askedTiming
+    ? "Book the future meeting now and set a light nurture touch in 3 weeks — do not chase weekly."
+    : "Call or reply within the hour. Speed is the whole game on warm leads.";
+
+  return { dealSummary: summary, wantToHear, objections: objections.slice(0, 2), openingLine, nextAction, styleTip: style };
 }
