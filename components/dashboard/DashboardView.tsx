@@ -23,6 +23,7 @@ export type DashboardData = {
     hasCoach: boolean; lastReply: string | null;
   }[];
   events: { type: string; description: string; at: string }[];
+  visits: { company: string | null; page: string | null; at: string }[];
 };
 
 const EVENT_ICONS: Record<string, string> = {
@@ -30,6 +31,7 @@ const EVENT_ICONS: Record<string, string> = {
   lead_enriched: "🧠", leads_imported: "📄", leads_discovered: "🎯",
   campaign_created: "📝", campaign_launched: "🚀", campaign_completed: "🏁",
   send_failed: "⚠️", workspace_seeded: "⚡", coach_generated: "🏆",
+  deal_won: "🎉", deal_lost: "📉", deal_nurture: "🌱",
 };
 
 function timeAgo(iso: string): string {
@@ -221,23 +223,45 @@ export function DashboardView({ data }: { data: DashboardData }) {
                 </div>
               )}
 
-              {/* buyers on your site — pixel teaser */}
+              {/* buyers on your site — the visitor pixel */}
               <div className="card rise rise-3 p-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-extrabold tracking-tight">Buyers on your site</h2>
-                  <span className="chip bg-pastel-lemon text-accent-lemon">Soon</span>
+                  {data.visits.length > 0 ? (
+                    <span className="chip bg-pastel-mint text-accent-mint"><span className="live-dot" /> Live</span>
+                  ) : (
+                    <Link href="/app/settings" className="chip bg-pastel-lemon text-accent-lemon transition hover:brightness-95">
+                      Install pixel →
+                    </Link>
+                  )}
                 </div>
-                <p className="mt-2 text-sm text-ink-muted">
-                  Drop one line of code on your website and companies browsing your pricing page
-                  show up here — warm before you ever say hi. 👀
-                </p>
-                <div className="mt-4 space-y-2 opacity-60" aria-hidden>
-                  {["Acme Corp viewed /pricing · 3×", "NorthPeak Labs viewed /product", "BlueOrbit read your case study"].map((t) => (
-                    <div key={t} className="rounded-2xl bg-surface-sunken px-4 py-2.5 text-xs font-semibold text-ink-soft blur-[1.5px]">
-                      {t}
+                {data.visits.length > 0 ? (
+                  <ul className="mt-4 space-y-2">
+                    {data.visits.map((v, i) => (
+                      <li key={i} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-sunken px-4 py-2.5 text-xs">
+                        <span className="min-w-0 truncate font-bold">
+                          {v.company ?? "A curious company"}
+                          <span className="font-semibold text-ink-muted"> viewed {v.page ?? "/"}</span>
+                        </span>
+                        <span className="shrink-0 text-ink-faint">{timeAgo(v.at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Drop one line of code on your website and companies browsing your pricing page
+                      show up here — warm before you ever say hi. 👀
+                    </p>
+                    <div className="mt-4 space-y-2 opacity-60" aria-hidden>
+                      {["Acme Corp viewed /pricing · 3×", "NorthPeak Labs viewed /product", "BlueOrbit read your case study"].map((t) => (
+                        <div key={t} className="rounded-2xl bg-surface-sunken px-4 py-2.5 text-xs font-semibold text-ink-soft blur-[1.5px]">
+                          {t}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
 
               {/* intent pipeline */}

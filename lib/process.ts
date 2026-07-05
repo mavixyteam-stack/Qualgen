@@ -8,7 +8,24 @@ import { sql, logEvent } from "./db";
 import { emailLive, sendCampaignEmail } from "./email";
 import { scoreReply } from "./ai";
 import { pickDemoReply, seededRng } from "./demo";
-import { COSTS, spendCredits, InsufficientCreditsError } from "./credits";
+import { COSTS, spendCredits, addCredits, InsufficientCreditsError } from "./credits";
+
+/** Draws send credits from the campaign's reservation; falls back to the
+ * wallet for campaigns launched before reservations existed. */
+async function drawSendCredit(orgId: string, campaignId: string, leadName: string): Promise<boolean> {
+  const drew = await sql`
+    update credit_reservations set remaining = remaining - ${COSTS.email_send}
+    where campaign_id = ${campaignId} and status = 'active' and remaining >= ${COSTS.email_send}
+    returning id`;
+  if (drew.length) return true;
+  try {
+    await spendCredits(orgId, COSTS.email_send, "email_send", `Email to ${leadName}`);
+    return true;
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) return false;
+    throw err;
+  }
+}
 
 export async function processDue(orgId: string): Promise<{ changed: number }> {
   let changed = 0;
@@ -58,18 +75,14 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
     limit 20`;
 
   for (const m of due) {
-    try {
-      await spendCredits(orgId, COSTS.email_send, "email_send", `Email step ${m.step} to ${m.lead_name}`);
-    } catch (err) {
-      if (err instanceof InsufficientCreditsError) {
-        await sql`update messages set status = 'failed' where id = ${m.id}`;
-        await logEvent(orgId, "send_failed", `Email to ${m.lead_name} failed — not enough credits`, {
-          campaignId: m.campaign_id, leadId: m.lead_id,
-        });
-        changed++;
-        continue;
-      }
-      throw err;
+    const funded = await drawSendCredit(orgId, m.campaign_id, m.lead_name);
+    if (!funded) {
+      await sql`update messages set status = 'failed' where id = ${m.id}`;
+      await logEvent(orgId, "send_failed", `Email to ${m.lead_name} failed — not enough credits`, {
+        campaignId: m.campaign_id, leadId: m.lead_id,
+      });
+      changed++;
+      continue;
     }
 
     if (emailLive() && m.lead_email) {
@@ -83,8 +96,10 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
         });
         await sql`update messages set status = 'sent', sent_at = ${now}, provider_id = ${providerId} where id = ${m.id}`;
       } catch (err) {
+        // Never charge for an email that didn't go out.
+        await addCredits(orgId, COSTS.email_send, "refund", `Auto-refund — email to ${m.lead_name} failed to send`);
         await sql`update messages set status = 'failed' where id = ${m.id}`;
-        await logEvent(orgId, "send_failed", `Email to ${m.lead_name} failed to send`, {
+        await logEvent(orgId, "send_failed", `Email to ${m.lead_name} failed to send — credit refunded`, {
           campaignId: m.campaign_id, leadId: m.lead_id,
         });
         changed++;
@@ -114,11 +129,40 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
       and not exists (select 1 from messages where campaign_id = campaigns.id and status = 'scheduled')
     returning id, name`;
   for (const c of completed) {
+    await releaseReservation(orgId, c.id, `Campaign "${c.name}" wrapped`);
     await logEvent(orgId, "campaign_completed", `Campaign "${c.name}" completed`, { campaignId: c.id });
     changed++;
   }
 
+  /* 5. Demo mode: simulate the website-visitor pixel so the tile lives ------- */
+  if (!emailLive()) {
+    const [org] = await sql`select demo_seeded from orgs where id = ${orgId}`;
+    if (org?.demo_seeded) {
+      const [{ n }] = await sql`select count(*)::int as n from site_visits where org_id = ${orgId}`;
+      if (n < 14 && Math.random() < 0.35) {
+        const companies = ["Acme Corp", "NorthPeak Labs", "BlueOrbit", "Zenith Retail", "CloudNest", "FinBridge", "UrbanKey", "SwiftCart"];
+        const pages = ["/pricing", "/product", "/case-studies", "/", "/pricing", "/book-a-demo"];
+        const company = companies[Math.floor(Math.random() * companies.length)];
+        const page = pages[Math.floor(Math.random() * pages.length)];
+        await sql`insert into site_visits (org_id, company, page) values (${orgId}, ${company}, ${page})`;
+        changed++;
+      }
+    }
+  }
+
   return { changed };
+}
+
+/** Returns unspent reserved credits to the wallet when a campaign ends. */
+async function releaseReservation(orgId: string, campaignId: string, why: string) {
+  const rows = await sql`
+    update credit_reservations set status = 'released', released_at = now()
+    where campaign_id = ${campaignId} and status = 'active'
+    returning remaining`;
+  const remaining = rows[0]?.remaining ?? 0;
+  if (remaining > 0) {
+    await addCredits(orgId, remaining, "refund", `${why} — ${remaining} unused credits returned`);
+  }
 }
 
 /**
@@ -138,9 +182,22 @@ export async function recordReply(
   });
 
   // Stop remaining sequence steps for this lead — a human conversation started.
+  // Their reserved send credits go straight back to the wallet.
   if (opts.campaignId) {
-    await sql`update messages set status = 'skipped'
-      where campaign_id = ${opts.campaignId} and lead_id = ${opts.leadId} and status = 'scheduled'`;
+    const skipped = await sql`update messages set status = 'skipped'
+      where campaign_id = ${opts.campaignId} and lead_id = ${opts.leadId} and status = 'scheduled'
+      returning id`;
+    if (skipped.length) {
+      const refund = skipped.length * COSTS.email_send;
+      const drew = await sql`
+        update credit_reservations set remaining = remaining - ${refund}
+        where campaign_id = ${opts.campaignId} and status = 'active' and remaining >= ${refund}
+        returning id`;
+      if (drew.length) {
+        await addCredits(orgId, refund, "refund",
+          `${leadName} replied — ${skipped.length} unsent email${skipped.length === 1 ? "" : "s"} refunded`);
+      }
+    }
   }
 
   // Score intent (1 credit). If the wallet is empty, keep the reply unscored.

@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { aiLive } from "@/lib/ai";
-import { emailLive } from "@/lib/email";
+import { appUrl, emailLive } from "@/lib/email";
 import { apolloLive } from "@/lib/apollo";
+import { PixelSnippet } from "@/components/PixelSnippet";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings — Mavixy" };
@@ -90,6 +91,17 @@ export default async function SettingsPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card mt-6 p-6">
+        <h2 className="text-lg font-extrabold tracking-tight">👀 Website-visitor pixel</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Paste this one line before <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs">&lt;/body&gt;</code> on
+          your website. Companies browsing your pages appear on the dashboard — warm buyers, before they ever fill a form.
+          {" "}Company names resolve automatically once <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs">IPINFO_TOKEN</code> is
+          connected (free tier).
+        </p>
+        <PixelSnippet snippet={`<script async src="${appUrl()}/api/px/script?o=${user.orgId}"></script>`} />
       </div>
 
       <div className="card mt-6 p-6">

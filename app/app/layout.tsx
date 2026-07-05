@@ -38,7 +38,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             🪙 <span className="text-sm font-extrabold tabular-nums">{user.credits.toLocaleString()}</span>
           </Link>
         </header>
-        <main className="min-w-0 flex-1 overflow-y-auto px-8 pb-10 pt-3">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto px-8 pb-10 pt-3">
+          {user.credits < 50 && (
+            <div className="rise mx-auto mb-4 flex max-w-6xl flex-wrap items-center justify-between gap-3 rounded-2xl bg-pastel-lemon px-5 py-3 text-sm font-semibold text-accent-lemon">
+              <span>🪫 Running low — {user.credits} credits left. Campaigns pause when the tank hits empty.</span>
+              <Link href="/app/credits" className="btn-secondary btn-sm">Top up</Link>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
       <ProcessPoller />
     </div>

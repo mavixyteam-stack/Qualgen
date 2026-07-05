@@ -308,10 +308,11 @@ export function CampaignWizard({ leads }: { leads: WizardLead[] }) {
       {step === 3 && (
         <div className="mt-6 space-y-4">
           <div className="card p-6">
-            <h2 className="text-lg font-bold">Review the sequences</h2>
+            <h2 className="text-lg font-extrabold">Review the sequences</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              Every lead gets their own 3-touch sequence. Sending costs 1 credit per email
-              ({selectedLeads.length * 3} credits max if nobody replies — replies stop the sequence).
+              Every buyer gets their own 3-touch sequence. Launching reserves{" "}
+              <span className="font-bold text-ink">{selectedLeads.length * 3} credits</span> (the worst case) —
+              every unsent email comes straight back when someone replies. You only ever pay for what actually goes out. 🤝
             </p>
           </div>
 

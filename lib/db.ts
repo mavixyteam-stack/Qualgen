@@ -64,6 +64,7 @@ create table if not exists leads (
 create index if not exists leads_org_idx on leads(org_id, created_at desc);
 alter table leads add column if not exists coach jsonb;
 alter table leads add column if not exists coach_at timestamptz;
+alter table leads add column if not exists outcome text;
 
 create table if not exists campaigns (
   id uuid primary key default gen_random_uuid(),
@@ -123,6 +124,28 @@ create table if not exists credit_transactions (
   created_at timestamptz not null default now()
 );
 create index if not exists tx_org_idx on credit_transactions(org_id, created_at desc);
+
+create table if not exists credit_reservations (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  amount integer not null,
+  remaining integer not null,
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  released_at timestamptz
+);
+create index if not exists reservations_campaign_idx on credit_reservations(campaign_id, status);
+
+create table if not exists site_visits (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references orgs(id) on delete cascade,
+  company text,
+  page text,
+  ip text,
+  created_at timestamptz not null default now()
+);
+create index if not exists visits_org_idx on site_visits(org_id, created_at desc);
 
 create table if not exists events (
   id uuid primary key default gen_random_uuid(),

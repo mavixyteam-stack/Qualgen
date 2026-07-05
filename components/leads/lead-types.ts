@@ -15,5 +15,6 @@ export type LeadRow = {
   intent_score: number | null;
   intent_label: string | null;
   enrichment: Enrichment | null;
+  outcome: string | null;
   created_at: string;
 };

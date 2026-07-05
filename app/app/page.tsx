@@ -66,6 +66,11 @@ export default async function DashboardPage() {
     where org_id = ${orgId}
     order by created_at desc limit 8`;
 
+  const visits = await sql`
+    select company, page, created_at from site_visits
+    where org_id = ${orgId}
+    order by created_at desc limit 4`;
+
   const data: DashboardData = {
     firstName: user.fullName.split(" ")[0],
     demoSeeded: user.demoSeeded,
@@ -86,6 +91,9 @@ export default async function DashboardPage() {
     })),
     events: events.map((e) => ({
       type: e.type, description: e.description, at: e.created_at.toISOString(),
+    })),
+    visits: visits.map((v) => ({
+      company: v.company, page: v.page, at: v.created_at.toISOString(),
     })),
   };
 

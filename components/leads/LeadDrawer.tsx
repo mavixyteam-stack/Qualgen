@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { IntentBadge, Spinner, StatusChip } from "@/components/ui";
 import type { LeadRow } from "./lead-types";
 
+const OUTCOME_META = [
+  { key: "won", label: "🎉 Won", active: "bg-pastel-mint text-accent-mint" },
+  { key: "lost", label: "Lost", active: "bg-pastel-pink text-accent-pink" },
+  { key: "nurture", label: "🌱 Nurture", active: "bg-pastel-lemon text-accent-lemon" },
+];
+
 export function LeadDrawer({
   lead,
   onClose,
@@ -19,6 +25,16 @@ export function LeadDrawer({
   const [error, setError] = useState<string | null>(null);
 
   if (!lead) return null;
+
+  async function setOutcome(outcome: string) {
+    const next = lead!.outcome === outcome ? null : outcome;
+    await fetch("/api/leads/outcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: lead!.id, outcome: next }),
+    });
+    router.refresh();
+  }
 
   async function enrich() {
     setBusy(true);
@@ -66,6 +82,23 @@ export function LeadDrawer({
                 🏆 Closing playbook
               </button>
             )}
+          </div>
+
+          <div>
+            <span className="label">Deal outcome — teaches the AI what wins</span>
+            <div className="flex flex-wrap gap-2">
+              {OUTCOME_META.map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => setOutcome(o.key)}
+                  className={`chip transition-all duration-200 active:scale-95 ${
+                    lead.outcome === o.key ? o.active : "bg-surface-sunken text-ink-muted hover:bg-surface-hover"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <dl className="grid grid-cols-2 gap-4 text-sm">

@@ -2,6 +2,7 @@ import { requireApiSession } from "@/lib/auth";
 import { sql, logEvent } from "@/lib/db";
 import { emailLive } from "@/lib/email";
 import { processDue } from "@/lib/process";
+import { COSTS, spendCredits, creditError } from "@/lib/credits";
 
 export const maxDuration = 60;
 
@@ -20,6 +21,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (!drafts[0].n) {
       return Response.json({ error: "Generate sequences before launching." }, { status: 400 });
     }
+
+    // Reserve → commit → refund: hold the worst case up front. Every unsent
+    // email (reply stops the sequence, failures) is refunded automatically.
+    const worstCase = drafts[0].n * COSTS.email_send;
+    await spendCredits(
+      session.orgId, worstCase, "reserve",
+      `Reserved for "${campaigns[0].name}" — max ${drafts[0].n} sends (unused credits auto-refund)`
+    );
+    await sql`insert into credit_reservations (org_id, campaign_id, amount, remaining)
+      values (${session.orgId}, ${id}, ${worstCase}, ${worstCase})`;
 
     // Demo mode compresses the sequence so a live demo shows all three touches
     // within minutes; with real email connected, follow-ups wait days.
@@ -42,6 +53,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return Response.json({ ok: true });
   } catch (err) {
     if (err instanceof Response) return err;
+    const credit = creditError(err);
+    if (credit) return credit;
     console.error(err);
     return Response.json({ error: "Launch failed." }, { status: 500 });
   }

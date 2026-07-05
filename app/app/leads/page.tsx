@@ -14,7 +14,7 @@ export default async function LeadsPage() {
 
   const rows = await sql`
     select id, name, title, company, email, linkedin_url, location, industry,
-           source, status, intent_score, intent_label, enrichment, created_at
+           source, status, intent_score, intent_label, enrichment, outcome, created_at
     from leads where org_id = ${session.orgId}
     order by created_at desc
     limit 1000`;
@@ -33,6 +33,7 @@ export default async function LeadsPage() {
     intent_score: r.intent_score,
     intent_label: r.intent_label,
     enrichment: r.enrichment,
+    outcome: r.outcome,
     created_at: r.created_at.toISOString(),
   }));
 
