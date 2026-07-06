@@ -2,6 +2,7 @@ import { requireApiSession } from "@/lib/auth";
 import { sql, logEvent } from "@/lib/db";
 import { parseIcp } from "@/lib/ai";
 import { apolloLive, searchApollo } from "@/lib/apollo";
+import { pdlLive, searchPDL } from "@/lib/pdl";
 import { generateSampleLeads } from "@/lib/demo";
 import { COSTS, spendCredits, creditError } from "@/lib/credits";
 
@@ -18,12 +19,22 @@ export async function POST(req: Request) {
 
     const icp = await parseIcp(prompt.trim());
 
-    let found;
-    let source: string;
-    if (apolloLive()) {
-      found = await searchApollo(icp, wanted);
-      source = "apollo";
-    } else {
+    // Sourcing waterfall: real providers first, demo factory as the floor so
+    // the flow never dead-ends even if a provider errors or returns nothing.
+    let found: Awaited<ReturnType<typeof searchPDL>> = [];
+    let source = "ai_search";
+    try {
+      if (pdlLive()) {
+        found = await searchPDL(icp, wanted);
+        if (found.length) source = "pdl";
+      } else if (apolloLive()) {
+        found = await searchApollo(icp, wanted);
+        if (found.length) source = "apollo";
+      }
+    } catch (provErr) {
+      console.error("lead provider failed, falling back to demo:", provErr);
+    }
+    if (!found.length) {
       found = generateSampleLeads(icp, wanted, `${session.orgId}-${Date.now()}`);
       source = "ai_search";
     }

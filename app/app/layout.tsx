@@ -2,15 +2,18 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { AppNav } from "@/components/AppNav";
 import { ProcessPoller } from "@/components/ProcessPoller";
-import { aiLive } from "@/lib/ai";
+import { aiLive, aiProvider } from "@/lib/ai";
 import { emailLive } from "@/lib/email";
 import Link from "next/link";
+
+const AI_LABEL: Record<string, string> = { groq: "Groq", anthropic: "Claude", demo: "demo" };
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const ai = aiLive();
+  const provider = aiProvider();
   const email = emailLive();
 
   return (
@@ -20,9 +23,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="flex items-center justify-end gap-2 px-8 pb-2 pt-5">
           <span
             className={`chip ${ai ? "bg-pastel-mint text-accent-mint" : "bg-white text-ink-muted shadow-soft"}`}
-            title={ai ? "Claude connected — AI runs live" : "Demo engine on — plug in a key to go live"}
+            title={ai ? `${AI_LABEL[provider]} connected — AI runs live` : "Demo engine on — plug in a key to go live"}
           >
-            {ai ? <span className="live-dot" /> : "◐"} AI {ai ? "live" : "demo"}
+            {ai ? <span className="live-dot" /> : "◐"} AI {ai ? AI_LABEL[provider] : "demo"}
           </span>
           <span
             className={`chip ${email ? "bg-pastel-mint text-accent-mint" : "bg-white text-ink-muted shadow-soft"}`}

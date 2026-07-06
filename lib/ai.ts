@@ -1,8 +1,8 @@
 /**
- * AI layer. When ANTHROPIC_API_KEY is set, Claude powers ICP parsing,
- * enrichment, sequence generation and intent scoring. Without a key (or if a
- * call fails), the deterministic demo engine takes over so the product always
- * works — demos never break.
+ * AI layer — provider-agnostic. Priority: Groq (fast + free daily limits,
+ * ideal for demos) → Anthropic Claude → deterministic demo engine. Whatever
+ * is configured, the app always works; if a live call fails, it falls back to
+ * the demo engine so a demo never breaks mid-pitch.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -16,19 +16,61 @@ import {
   scoreReplyHeuristic,
 } from "./demo";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
-export function aiLive(): boolean {
+function groqLive() {
+  return !!process.env.GROQ_API_KEY;
+}
+function anthropicLive() {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
-function client() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+export function aiLive(): boolean {
+  return groqLive() || anthropicLive();
 }
 
-async function claudeJson<T>(system: string, user: string, maxTokens = 1200): Promise<T> {
-  const res = await client().messages.create({
-    model: MODEL,
+/** Which engine is actually serving AI right now (for the UI badge). */
+export function aiProvider(): "groq" | "anthropic" | "demo" {
+  if (groqLive()) return "groq";
+  if (anthropicLive()) return "anthropic";
+  return "demo";
+}
+
+function extractJson<T>(text: string): T {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON in AI response");
+  return JSON.parse(match[0]) as T;
+}
+
+async function groqJson<T>(system: string, user: string, maxTokens: number): Promise<T> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: `${system}\nRespond with ONLY a valid JSON object.` },
+        { role: "user", content: user },
+      ],
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text().catch(() => "")}`);
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content ?? "";
+  return extractJson<T>(text);
+}
+
+async function anthropicJson<T>(system: string, user: string, maxTokens: number): Promise<T> {
+  const res = await new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }).messages.create({
+    model: ANTHROPIC_MODEL,
     max_tokens: maxTokens,
     system: `${system}\nRespond with ONLY a valid JSON object — no markdown fences, no commentary.`,
     messages: [{ role: "user", content: user }],
@@ -37,9 +79,13 @@ async function claudeJson<T>(system: string, user: string, maxTokens = 1200): Pr
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("");
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON in AI response");
-  return JSON.parse(match[0]) as T;
+  return extractJson<T>(text);
+}
+
+/** Routes to whichever provider is configured, Groq first. */
+async function chatJson<T>(system: string, user: string, maxTokens = 1200): Promise<T> {
+  if (groqLive()) return groqJson<T>(system, user, maxTokens);
+  return anthropicJson<T>(system, user, maxTokens);
 }
 
 /* -------------------------------- ICP parse -------------------------------- */
@@ -47,7 +93,7 @@ async function claudeJson<T>(system: string, user: string, maxTokens = 1200): Pr
 export async function parseIcp(prompt: string): Promise<Icp> {
   if (!aiLive()) return parseIcpHeuristic(prompt);
   try {
-    const parsed = await claudeJson<Icp>(
+    const parsed = await chatJson<Icp>(
       `You parse ideal-customer-profile descriptions into structured search filters for a B2B lead database.
 Return JSON: {"industries": string[], "titles": string[], "locations": string[], "companySize": string, "keywords": string[]}.
 Use common industry names (SaaS, Fintech, E-commerce, Healthcare, EdTech, Real Estate, Agency, Logistics) and common job titles.`,
@@ -69,7 +115,7 @@ Use common industry names (SaaS, Fintech, E-commerce, Healthcare, EdTech, Real E
 export async function enrichLead(lead: LeadInput & { id?: string }): Promise<{ enrichment: Enrichment; engine: "ai" | "demo" }> {
   if (aiLive()) {
     try {
-      const enrichment = await claudeJson<Enrichment>(
+      const enrichment = await chatJson<Enrichment>(
         `You are the prospect-intelligence engine of Mavixy, an AI sales qualification platform.
 Given a B2B lead's basic details, produce a plausible, useful prospect intelligence card a salesperson can act on.
 Be specific and grounded in the lead's role, company and industry. Do not invent verifiable facts like exact funding amounts — frame signals as "likely" patterns for this profile.
@@ -103,7 +149,7 @@ export async function generateSequence(
 ): Promise<{ steps: SequenceStep[]; engine: "ai" | "demo" }> {
   if (aiLive()) {
     try {
-      const out = await claudeJson<{ steps: SequenceStep[] }>(
+      const out = await chatJson<{ steps: SequenceStep[] }>(
         `You write cold-email sequences for Mavixy, an AI lead qualification & outreach platform.
 Write a 3-touch email sequence to this prospect. Rules:
 - Reference the prospect's real context (role, company, signals from the intelligence card) — never generic filler.
@@ -134,7 +180,7 @@ export async function generateCoach(
   const lastReply = replies.length ? replies[replies.length - 1] : null;
   if (aiLive()) {
     try {
-      const coach = await claudeJson<CoachCard>(
+      const coach = await chatJson<CoachCard>(
         `You are Mavixy AI's sales coach. Given a lead's profile, intelligence card and their reply history, write a closing playbook for the human salesperson about to engage them.
 Be concrete and tactical — coach for THIS buyer, not generic sales advice. Ground everything in their actual replies and profile.
 Return JSON: {"dealSummary": string (2-3 sentences, where this deal stands and why it's winnable), "wantToHear": string[3] (what this buyer needs to hear to move), "objections": [{"objection": string, "answer": string}] (max 2, from their actual replies), "openingLine": string (the exact line to open the call/reply with, in quotes), "nextAction": string (one concrete next move with timing), "styleTip": string (how to talk to this person)}`,
@@ -158,7 +204,7 @@ Return JSON: {"dealSummary": string (2-3 sentences, where this deal stands and w
 export async function scoreReply(text: string): Promise<{ result: IntentResult; engine: "ai" | "demo" }> {
   if (aiLive()) {
     try {
-      const out = await claudeJson<{ score: number; reasoning: string }>(
+      const out = await chatJson<{ score: number; reasoning: string }>(
         `You are the intent-qualification engine of a sales platform. Score the buying intent of this email reply from a prospect.
 Scale: 0-30 cold (negative/no interest), 31-60 warm (mild curiosity or timing objection), 61-85 hot (active interest, questions about product/pricing), 86-100 sales ready (explicit ask for call/demo/purchase).
 Return JSON: {"score": number, "reasoning": string (one sentence citing the signals)}`,

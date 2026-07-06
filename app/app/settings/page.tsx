@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { aiLive } from "@/lib/ai";
+import { aiLive, aiProvider } from "@/lib/ai";
 import { appUrl, emailLive } from "@/lib/email";
 import { apolloLive } from "@/lib/apollo";
+import { pdlLive } from "@/lib/pdl";
 import { PixelSnippet } from "@/components/PixelSnippet";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +13,18 @@ export default async function SettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const provider = aiProvider();
+  const providerName = provider === "groq" ? "Groq (Llama 3.3)" : provider === "anthropic" ? "Claude" : "AI";
+
   const integrations = [
     {
-      name: "AI engine (Claude)",
+      name: "AI engine",
       emoji: "🧠",
       live: aiLive(),
-      env: "ANTHROPIC_API_KEY",
-      liveNote: "Claude generates enrichment, sequences and intent scores.",
+      env: "GROQ_API_KEY",
+      liveNote: `${providerName} generates enrichment, sequences, intent scores and closing playbooks.`,
       demoNote: "The built-in demo engine generates all intelligence — free, deterministic, demo-safe.",
-      how: "Get a key at console.anthropic.com (pay per use, a few rupees per campaign).",
+      how: "Free daily limits at console.groq.com (fast Llama models) — or set ANTHROPIC_API_KEY for Claude.",
     },
     {
       name: "Email delivery (Resend)",
@@ -32,13 +36,15 @@ export default async function SettingsPage() {
       how: "Free tier at resend.com — 3,000 emails/month, no card needed.",
     },
     {
-      name: "Lead database (Apollo)",
+      name: "Lead database (People Data Labs)",
       emoji: "🎯",
-      live: apolloLive(),
-      env: "APOLLO_API_KEY",
-      liveNote: "AI search pulls real prospects from Apollo.io.",
+      live: pdlLive() || apolloLive(),
+      env: "PDL_API_KEY",
+      liveNote: pdlLive()
+        ? "AI search pulls real prospects from People Data Labs (3B+ profiles)."
+        : "AI search pulls real prospects from Apollo.io.",
       demoNote: "AI search generates realistic sample prospects matching your ICP.",
-      how: "Free trial at apollo.io.",
+      how: "Free tier at peopledatalabs.com — 100 lookups/month, no card needed.",
     },
   ];
 

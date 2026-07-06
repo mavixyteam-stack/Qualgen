@@ -13,6 +13,7 @@ const SOURCE_NAMES: Record<string, string> = {
   csv: "CSV import",
   ai_search: "AI search",
   apollo: "Apollo",
+  pdl: "People Data Labs",
 };
 
 export function LeadsView({ leads }: { leads: LeadRow[] }) {
