@@ -14,6 +14,7 @@ import {
 export type DashboardData = {
   firstName: string;
   demoSeeded: boolean;
+  mode: "demo" | "live";
   stats: { leads: number; sent: number; openRate: number; replies: number; hot: number; ready: number };
   intentCounts: Record<string, number>;
   activity: ActivityPoint[];
@@ -91,16 +92,30 @@ export function DashboardView({ data }: { data: DashboardData }) {
       </div>
 
       {isEmpty ? (
-        <div className="card rise rise-2 mt-8 flex flex-col items-center gap-4 px-8 py-16 text-center">
-          <div className="float-slow flex h-16 w-16 items-center justify-center rounded-3xl bg-pastel-lavender text-3xl">⚡</div>
-          <h2 className="text-xl font-extrabold">It&rsquo;s quiet in here… too quiet.</h2>
-          <p className="max-w-md text-sm text-ink-muted">
-            Load the sample workspace and get 14 enriched buyers, a finished campaign, live intent
-            scores — the whole show, in one click. Or start fresh with your own leads.
-          </p>
-          <SeedButton />
-          <Link href="/app/leads" className="btn-secondary btn-md">🎯 Bring my own leads</Link>
-        </div>
+        data.mode === "demo" ? (
+          <div className="card rise rise-2 mt-8 flex flex-col items-center gap-4 px-8 py-16 text-center">
+            <div className="float-slow flex h-16 w-16 items-center justify-center rounded-3xl bg-pastel-lavender text-3xl">⚡</div>
+            <h2 className="text-xl font-extrabold">It&rsquo;s quiet in here… too quiet.</h2>
+            <p className="max-w-md text-sm text-ink-muted">
+              Load the sample workspace and get 14 enriched buyers, a finished campaign, live intent
+              scores — the whole show, in one click.
+            </p>
+            <SeedButton />
+          </div>
+        ) : (
+          <div className="card rise rise-2 mt-8 flex flex-col items-center gap-4 px-8 py-16 text-center">
+            <div className="float-slow flex h-16 w-16 items-center justify-center rounded-3xl bg-pastel-mint text-3xl">⚡</div>
+            <h2 className="text-xl font-extrabold">Live workspace — 100% real, zero dummy data.</h2>
+            <p className="max-w-md text-sm text-ink-muted">
+              Every lead here will be a real person, every send a real email. Start small: find
+              2–3 real buyers, launch a real campaign, watch real opens roll in.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link href="/app/leads" className="btn-primary btn-md">✨ Find real buyers</Link>
+              <Link href="/app/leads" className="btn-secondary btn-md">📄 Import CSV</Link>
+            </div>
+          </div>
+        )
       ) : (
         <>
           {/* stat cards */}

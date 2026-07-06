@@ -65,6 +65,26 @@ create index if not exists leads_org_idx on leads(org_id, created_at desc);
 alter table leads add column if not exists coach jsonb;
 alter table leads add column if not exists coach_at timestamptz;
 alter table leads add column if not exists outcome text;
+alter table orgs add column if not exists mode text not null default 'live';
+alter table users add column if not exists role text not null default 'member';
+
+create table if not exists provider_costs (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid references orgs(id) on delete set null,
+  provider text not null,
+  action text not null,
+  units integer not null default 1,
+  cost_inr numeric(10,4) not null default 0,
+  reference text,
+  created_at timestamptz not null default now()
+);
+create index if not exists provider_costs_idx on provider_costs(provider, created_at desc);
+
+create table if not exists provider_settings (
+  provider text primary key,
+  enabled boolean not null default true,
+  updated_at timestamptz not null default now()
+);
 
 create table if not exists campaigns (
   id uuid primary key default gen_random_uuid(),

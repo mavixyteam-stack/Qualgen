@@ -136,6 +136,15 @@ export async function seedSampleWorkspace(orgId: string, seederName: string) {
     await sql`insert into credit_transactions (org_id, delta, balance_after, action, description, created_at)
       values (${orgId}, ${t.delta}, ${balance}, ${t.action}, ${t.description}, ${t.at})`;
   }
+  // A few recent "buyers on your site" so the visitor tile is alive immediately.
+  const visitCompanies = [
+    ["Acme Corp", "/pricing"], ["NorthPeak Labs", "/product"], ["BlueOrbit", "/case-studies"], ["Zenith Retail", "/pricing"],
+  ] as const;
+  for (let i = 0; i < visitCompanies.length; i++) {
+    await sql`insert into site_visits (org_id, company, page, created_at)
+      values (${orgId}, ${visitCompanies[i][0]}, ${visitCompanies[i][1]}, ${new Date(now - (i + 1) * 2 * 3600_000)})`;
+  }
+
   await sql`update orgs set credits = ${balance}, demo_seeded = true where id = ${orgId}`;
   await logEvent(orgId, "workspace_seeded", "Sample workspace loaded — explore, then run your own campaign");
 

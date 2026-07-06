@@ -18,9 +18,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppNav orgName={user.orgName} userName={user.fullName} />
+      <AppNav orgName={user.orgName} userName={user.fullName} isAdmin={user.role === "admin"} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-end gap-2 px-8 pb-2 pt-5">
+          <span
+            className={`chip mr-auto ${user.mode === "demo" ? "bg-pastel-lavender text-brand-700" : "bg-pastel-mint text-accent-mint"}`}
+            title={user.mode === "demo" ? "Demo workspace — everything simulated, zero API spend" : "Live workspace — real data, real sends"}
+          >
+            {user.mode === "demo" ? "🎪 Demo workspace" : "⚡ Live workspace"}
+          </span>
           <span
             className={`chip ${ai ? "bg-pastel-mint text-accent-mint" : "bg-white text-ink-muted shadow-soft"}`}
             title={ai ? `${AI_LABEL[provider]} connected — AI runs live` : "Demo engine on — plug in a key to go live"}

@@ -73,6 +73,7 @@ export default async function DashboardPage() {
   const data: DashboardData = {
     firstName: user.fullName.split(" ")[0],
     demoSeeded: user.demoSeeded,
+    mode: user.mode,
     stats: {
       leads: leadStats.total,
       sent: msgStats.sent,

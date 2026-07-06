@@ -1,8 +1,8 @@
 import { requireApiSession } from "@/lib/auth";
 import { sql, logEvent } from "@/lib/db";
-import { emailLive } from "@/lib/email";
 import { processDue } from "@/lib/process";
 import { COSTS, spendCredits, creditError } from "@/lib/credits";
+import { orgMode } from "@/lib/providers";
 
 export const maxDuration = 60;
 
@@ -32,9 +32,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     await sql`insert into credit_reservations (org_id, campaign_id, amount, remaining)
       values (${session.orgId}, ${id}, ${worstCase}, ${worstCase})`;
 
-    // Demo mode compresses the sequence so a live demo shows all three touches
-    // within minutes; with real email connected, follow-ups wait days.
-    const stepDelayMs = emailLive() ? 3 * 86_400_000 : 120_000;
+    // Demo workspaces compress the sequence so a pitch shows all three touches
+    // within minutes; live workspaces wait real days between follow-ups.
+    const stepDelayMs = (await orgMode(session.orgId)) === "live" ? 3 * 86_400_000 : 120_000;
     const now = Date.now();
 
     await sql`

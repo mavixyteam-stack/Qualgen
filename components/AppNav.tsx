@@ -14,7 +14,15 @@ const LINKS = [
   { href: "/app/settings", label: "Settings", icon: IconGear, chip: "bg-pastel-mint text-accent-mint" },
 ];
 
-export function AppNav({ orgName, userName }: { orgName: string; userName: string }) {
+export function AppNav({
+  orgName,
+  userName,
+  isAdmin,
+}: {
+  orgName: string;
+  userName: string;
+  isAdmin?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -39,6 +47,21 @@ export function AppNav({ orgName, userName }: { orgName: string; userName: strin
       </div>
 
       <nav className="flex flex-1 flex-col gap-1.5 px-4">
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={`group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold transition-all duration-200 ${
+              pathname.startsWith("/admin")
+                ? "bg-ink text-white"
+                : "text-ink-soft hover:bg-surface-hover hover:translate-x-0.5"
+            }`}
+          >
+            <span className={`icon-chip h-9 w-9 ${pathname.startsWith("/admin") ? "bg-white/15 text-white" : "bg-ink text-white"}`}>
+              🛡️
+            </span>
+            Control tower
+          </Link>
+        )}
         {LINKS.map((l) => {
           const active = l.href === "/app" ? pathname === "/app" : pathname.startsWith(l.href);
           const Icon = l.icon;

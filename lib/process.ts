@@ -9,6 +9,7 @@ import { emailLive, sendCampaignEmail } from "./email";
 import { scoreReply } from "./ai";
 import { pickDemoReply, seededRng } from "./demo";
 import { COSTS, spendCredits, addCredits, InsufficientCreditsError } from "./credits";
+import { orgMode, providerEnabled, recordCost } from "./providers";
 
 /** Draws send credits from the campaign's reservation; falls back to the
  * wallet for campaigns launched before reservations existed. */
@@ -30,6 +31,10 @@ async function drawSendCredit(orgId: string, campaignId: string, leadName: strin
 export async function processDue(orgId: string): Promise<{ changed: number }> {
   let changed = 0;
   const now = new Date();
+  // Workspace mode decides everything: demo workspaces simulate the world and
+  // never touch paid providers; live workspaces are 100% real, zero dummy data.
+  const mode = await orgMode(orgId);
+  const canSendReal = mode === "live" && emailLive() && (await providerEnabled("resend"));
 
   /* 1. Materialize simulated opens ------------------------------------------ */
   const opens = await sql`
@@ -85,7 +90,7 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
       continue;
     }
 
-    if (emailLive() && m.lead_email) {
+    if (canSendReal && m.lead_email) {
       try {
         const { providerId } = await sendCampaignEmail({
           to: m.lead_email,
@@ -95,6 +100,7 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
           fromName: m.sender_name || "Mavixy",
         });
         await sql`update messages set status = 'sent', sent_at = ${now}, provider_id = ${providerId} where id = ${m.id}`;
+        await recordCost(orgId, "resend", "email_send", 1, m.id);
       } catch {
         // Never charge for an email that didn't go out.
         await addCredits(orgId, COSTS.email_send, "refund", `Auto-refund — email to ${m.lead_name} failed to send`);
@@ -105,8 +111,8 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
         changed++;
         continue;
       }
-    } else {
-      // Demo mode: record the send and schedule realistic simulated engagement.
+    } else if (mode === "demo") {
+      // Demo workspace: record the send and schedule realistic simulated engagement.
       const rng = seededRng(m.id);
       const willOpen = rng() < 0.72;
       const willReply = willOpen && rng() < 0.45;
@@ -114,6 +120,16 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
       const replyAt = willReply && openAt ? new Date(openAt.getTime() + (25 + rng() * 90) * 1000) : null;
       await sql`update messages set status = 'sent', sent_at = ${now},
         sim_open_at = ${openAt}, sim_reply_at = ${replyAt} where id = ${m.id}`;
+    } else {
+      // Live workspace but email delivery unavailable (no key / disabled / no
+      // address): fail honestly, refund — never fake a send in live mode.
+      await addCredits(orgId, COSTS.email_send, "refund", `Auto-refund — email to ${m.lead_name} not sent (delivery unavailable)`);
+      await sql`update messages set status = 'failed' where id = ${m.id}`;
+      await logEvent(orgId, "send_failed", `Email to ${m.lead_name} not sent — email delivery is not configured`, {
+        campaignId: m.campaign_id, leadId: m.lead_id,
+      });
+      changed++;
+      continue;
     }
     await logEvent(orgId, "email_sent", `Step ${m.step} email sent to ${m.lead_name}`, {
       campaignId: m.campaign_id, leadId: m.lead_id,
@@ -134,8 +150,8 @@ export async function processDue(orgId: string): Promise<{ changed: number }> {
     changed++;
   }
 
-  /* 5. Demo mode: simulate the website-visitor pixel so the tile lives ------- */
-  if (!emailLive()) {
+  /* 5. Demo workspaces: simulate the website-visitor pixel so the tile lives -- */
+  if (mode === "demo") {
     const [org] = await sql`select demo_seeded from orgs where id = ${orgId}`;
     if (org?.demo_seeded) {
       const [{ n }] = await sql`select count(*)::int as n from site_visits where org_id = ${orgId}`;

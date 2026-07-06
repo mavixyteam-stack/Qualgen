@@ -19,7 +19,7 @@ function clean(s: string): string {
 }
 
 /** Maps our ICP into a PDL SQL query. PDL stores locations as lowercase names. */
-function buildSql(icp: Icp, size: number): string {
+function buildSql(icp: Icp): string {
   const conds: string[] = [];
 
   const titleWords = icp.titles.flatMap((t) =>
@@ -91,7 +91,7 @@ export async function searchPDL(icp: Icp, count: number): Promise<LeadInput[]> {
       "Content-Type": "application/json",
       "X-Api-Key": process.env.PDL_API_KEY!,
     },
-    body: JSON.stringify({ sql: buildSql(icp, size), size, pretty: false }),
+    body: JSON.stringify({ sql: buildSql(icp), size, pretty: false }),
     signal: AbortSignal.timeout(20_000),
   });
 

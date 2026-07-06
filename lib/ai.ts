@@ -82,10 +82,20 @@ async function anthropicJson<T>(system: string, user: string, maxTokens: number)
   return extractJson<T>(text);
 }
 
-/** Routes to whichever provider is configured, Groq first. */
+/** Routes to whichever provider is configured AND admin-enabled, Groq first. */
 async function chatJson<T>(system: string, user: string, maxTokens = 1200): Promise<T> {
-  if (groqLive()) return groqJson<T>(system, user, maxTokens);
-  return anthropicJson<T>(system, user, maxTokens);
+  const { providerEnabled, recordCost } = await import("./providers");
+  if (groqLive() && (await providerEnabled("groq"))) {
+    const out = await groqJson<T>(system, user, maxTokens);
+    await recordCost(null, "groq", "ai_call", 1);
+    return out;
+  }
+  if (anthropicLive() && (await providerEnabled("anthropic"))) {
+    const out = await anthropicJson<T>(system, user, maxTokens);
+    await recordCost(null, "anthropic", "ai_call", 1);
+    return out;
+  }
+  throw new Error("No AI provider enabled"); // callers fall back to the demo engine
 }
 
 /* -------------------------------- ICP parse -------------------------------- */

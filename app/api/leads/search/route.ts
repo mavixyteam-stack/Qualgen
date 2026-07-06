@@ -5,6 +5,7 @@ import { apolloLive, searchApollo } from "@/lib/apollo";
 import { pdlLive, searchPDL } from "@/lib/pdl";
 import { generateSampleLeads } from "@/lib/demo";
 import { COSTS, spendCredits, creditError } from "@/lib/credits";
+import { orgMode, providerEnabled, recordCost } from "@/lib/providers";
 
 export const maxDuration = 60;
 
@@ -19,22 +20,40 @@ export async function POST(req: Request) {
 
     const icp = await parseIcp(prompt.trim());
 
-    // Sourcing waterfall: real providers first, demo factory as the floor so
-    // the flow never dead-ends even if a provider errors or returns nothing.
+    // Sourcing waterfall. Demo workspaces always get the sample factory (zero
+    // provider spend). Live workspaces get REAL data or an honest error —
+    // dummy leads never enter a live workspace.
+    const mode = await orgMode(session.orgId);
     let found: Awaited<ReturnType<typeof searchPDL>> = [];
     let source = "ai_search";
-    try {
-      if (pdlLive()) {
-        found = await searchPDL(icp, wanted);
-        if (found.length) source = "pdl";
-      } else if (apolloLive()) {
-        found = await searchApollo(icp, wanted);
-        if (found.length) source = "apollo";
+    if (mode === "live") {
+      let providerError: string | null = null;
+      try {
+        if (pdlLive() && (await providerEnabled("pdl"))) {
+          found = await searchPDL(icp, wanted);
+          if (found.length) {
+            source = "pdl";
+            await recordCost(session.orgId, "pdl", "discover", found.length);
+          }
+        } else if (apolloLive() && (await providerEnabled("apollo"))) {
+          found = await searchApollo(icp, wanted);
+          if (found.length) source = "apollo";
+        } else {
+          providerError = "No lead-data provider is connected for live search.";
+        }
+      } catch (provErr) {
+        console.error("lead provider failed:", provErr);
+        providerError = "The lead-data provider didn't respond.";
       }
-    } catch (provErr) {
-      console.error("lead provider failed, falling back to demo:", provErr);
-    }
-    if (!found.length) {
+      if (!found.length) {
+        return Response.json(
+          {
+            error: `${providerError ?? "No matching people found for that description."} This live workspace never gets sample data — try a broader description, import a CSV of real leads, or use the demo workspace to show the flow.`,
+          },
+          { status: 502 }
+        );
+      }
+    } else {
       found = generateSampleLeads(icp, wanted, `${session.orgId}-${Date.now()}`);
       source = "ai_search";
     }

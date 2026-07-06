@@ -55,10 +55,12 @@ export type CurrentUser = {
   id: string;
   email: string;
   fullName: string;
+  role: string;
   orgId: string;
   orgName: string;
   credits: number;
   demoSeeded: boolean;
+  mode: "demo" | "live";
 };
 
 /** Cached per request — layout and page share one DB hit instead of two. */
@@ -67,8 +69,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   if (!session) return null;
   await ensureSchema();
   const rows = await sql`
-    select u.id, u.email, u.full_name, o.id as org_id, o.name as org_name,
-           o.credits, o.demo_seeded
+    select u.id, u.email, u.full_name, u.role, o.id as org_id, o.name as org_name,
+           o.credits, o.demo_seeded, o.mode
     from users u join orgs o on o.id = u.org_id
     where u.id = ${session.userId}`;
   if (!rows.length) return null;
@@ -77,10 +79,12 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     id: r.id,
     email: r.email,
     fullName: r.full_name,
+    role: r.role ?? "member",
     orgId: r.org_id,
     orgName: r.org_name,
     credits: r.credits,
     demoSeeded: r.demo_seeded,
+    mode: r.mode === "demo" ? "demo" : "live",
   };
 });
 
@@ -91,5 +95,15 @@ export async function requireApiSession(): Promise<Session> {
     throw Response.json({ error: "Not signed in" }, { status: 401 });
   }
   await ensureSchema();
+  return session;
+}
+
+/** For admin route handlers: session must belong to a platform admin. */
+export async function requireAdmin(): Promise<Session> {
+  const session = await requireApiSession();
+  const rows = await sql`select role from users where id = ${session.userId}`;
+  if (rows[0]?.role !== "admin") {
+    throw Response.json({ error: "Admins only." }, { status: 403 });
+  }
   return session;
 }

@@ -7,6 +7,13 @@ export const maxDuration = 60;
 export async function POST() {
   try {
     const session = await requireApiSession();
+    const [org] = await sql`select mode from orgs where id = ${session.orgId}`;
+    if (org?.mode !== "demo") {
+      return Response.json(
+        { error: "Sample data is demo-workspace only — this live workspace stays 100% real." },
+        { status: 403 }
+      );
+    }
     const users = await sql`select full_name from users where id = ${session.userId}`;
     const result = await seedSampleWorkspace(session.orgId, users[0]?.full_name ?? "Mavixy");
     if (!result.seeded) {
