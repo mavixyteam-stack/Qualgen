@@ -6,9 +6,10 @@ import { seedSampleWorkspace } from "@/lib/seed";
 export const maxDuration = 60;
 
 /**
- * One-time account provisioning: demo, live and admin logins.
- * Guarded by SESSION_SECRET; passwords are generated fresh and shown ONCE in
- * the response — nothing secret lives in this (public) repository.
+ * Account provisioning: demo, live and admin logins.
+ * Guarded by SESSION_SECRET. Idempotent AND self-healing — every run resets
+ * each account's password and shows it, so you always walk away with working
+ * credentials no matter the prior state. Nothing secret lives in this repo.
  *
  * Visit: /api/bootstrap?key=<your SESSION_SECRET>
  */
@@ -17,56 +18,90 @@ function pw(): string {
   return randomBytes(9).toString("base64").replace(/[/+=]/g, "x");
 }
 
-async function createAccount(opts: {
+type Spec = {
   email: string;
   fullName: string;
   orgName: string;
   mode: "demo" | "live";
   role: "member" | "admin";
   credits: number;
-}): Promise<{ email: string; password?: string; status: "created" | "already exists" }> {
-  const existing = await sql`select 1 from users where email = ${opts.email}`;
-  if (existing.length) return { email: opts.email, status: "already exists" };
+};
 
+async function provision(spec: Spec) {
   const password = pw();
   const hash = await hashPassword(password);
-  const orgRows = await sql`insert into orgs (name, credits, mode)
-    values (${opts.orgName}, ${opts.credits}, ${opts.mode}) returning id`;
-  await sql`insert into users (org_id, email, password_hash, full_name, role)
-    values (${orgRows[0].id}, ${opts.email}, ${hash}, ${opts.fullName}, ${opts.role})`;
-  await sql`insert into credit_transactions (org_id, delta, balance_after, action, description)
-    values (${orgRows[0].id}, ${opts.credits}, ${opts.credits}, 'signup_bonus', 'Workspace provisioned')`;
 
-  if (opts.mode === "demo") {
-    await seedSampleWorkspace(orgRows[0].id, opts.fullName);
+  const existing = await sql`select id, org_id from users where email = ${spec.email}`;
+
+  if (existing.length) {
+    // Reset password + role so the account is always usable and correct.
+    await sql`update users set password_hash = ${hash}, role = ${spec.role}, full_name = ${spec.fullName}
+      where id = ${existing[0].id}`;
+    await sql`update orgs set mode = ${spec.mode} where id = ${existing[0].org_id}`;
+    return { email: spec.email, password, status: "reset" as const };
   }
-  return { email: opts.email, password, status: "created" };
+
+  // Fresh create. Seeding is best-effort — it must never block account creation.
+  const orgRows = await sql`insert into orgs (name, credits, mode)
+    values (${spec.orgName}, ${spec.credits}, ${spec.mode}) returning id`;
+  const orgId = orgRows[0].id;
+  await sql`insert into users (org_id, email, password_hash, full_name, role)
+    values (${orgId}, ${spec.email}, ${hash}, ${spec.fullName}, ${spec.role})`;
+  await sql`insert into credit_transactions (org_id, delta, balance_after, action, description)
+    values (${orgId}, ${spec.credits}, ${spec.credits}, 'signup_bonus', 'Workspace provisioned')`;
+
+  let seeded = false;
+  if (spec.mode === "demo") {
+    try {
+      await seedSampleWorkspace(orgId, spec.fullName);
+      seeded = true;
+    } catch (err) {
+      console.error("demo seed failed (account still created):", err);
+    }
+  }
+  return { email: spec.email, password, status: "created" as const, seeded };
 }
+
+const SPECS: Spec[] = [
+  { email: "demo@mavixy.ai", fullName: "Demo Pilot", orgName: "Mavixy Demo Studio", mode: "demo", role: "member", credits: 500 },
+  { email: "founder@mavixy.ai", fullName: "Mavixy Founder", orgName: "Mavixy Live", mode: "live", role: "member", credits: 500 },
+  { email: "admin@mavixy.ai", fullName: "Mavixy Admin", orgName: "Mavixy HQ", mode: "live", role: "admin", credits: 1000 },
+];
 
 export async function GET(req: Request) {
   const key = new URL(req.url).searchParams.get("key");
   if (!process.env.SESSION_SECRET || key !== process.env.SESSION_SECRET) {
-    return Response.json({ error: "Nope." }, { status: 403 });
+    return Response.json({ error: "Wrong key. Use your exact SESSION_SECRET value." }, { status: 403 });
   }
-  await ensureSchema();
 
-  const results = [];
-  results.push(await createAccount({
-    email: "demo@mavixy.ai", fullName: "Demo Pilot", orgName: "Mavixy Demo Studio",
-    mode: "demo", role: "member", credits: 500,
-  }));
-  results.push(await createAccount({
-    email: "founder@mavixy.ai", fullName: "Mavixy Founder", orgName: "Mavixy Live",
-    mode: "live", role: "member", credits: 500,
-  }));
-  results.push(await createAccount({
-    email: "admin@mavixy.ai", fullName: "Mavixy Admin", orgName: "Mavixy HQ",
-    mode: "live", role: "admin", credits: 1000,
-  }));
+  try {
+    await ensureSchema();
+  } catch (err) {
+    console.error("schema init failed", err);
+    return Response.json({ error: "Database not reachable — check DATABASE_URL and redeploy." }, { status: 500 });
+  }
+
+  // Provision each independently so one failure can't block the others.
+  const accounts = [];
+  const errors: string[] = [];
+  for (const spec of SPECS) {
+    try {
+      accounts.push(await provision(spec));
+    } catch (err) {
+      console.error(`provision ${spec.email} failed`, err);
+      errors.push(`${spec.email}: ${err instanceof Error ? err.message : "failed"}`);
+    }
+  }
 
   return Response.json({
-    ok: true,
-    note: "SAVE THESE PASSWORDS NOW — they are shown only this once. Accounts that already existed keep their old password.",
-    accounts: results,
+    ok: errors.length === 0,
+    note: "SAVE THESE PASSWORDS NOW. Every run resets them, so re-run anytime you lose them.",
+    logins: {
+      "🎪 Demo (full flow, no spend)": "demo@mavixy.ai",
+      "⚡ Live (real leads & sends)": "founder@mavixy.ai",
+      "🛡️ Admin (control tower)": "admin@mavixy.ai",
+    },
+    accounts,
+    errors: errors.length ? errors : undefined,
   });
 }
