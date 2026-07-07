@@ -78,7 +78,25 @@ export async function GET(req: Request) {
     await ensureSchema();
   } catch (err) {
     console.error("schema init failed", err);
-    return Response.json({ error: "Database not reachable — check DATABASE_URL and redeploy." }, { status: 500 });
+    // Safe diagnostic: show the DB host it tried (never the password) so we
+    // can tell instantly whether Vercel has the right DATABASE_URL.
+    let host = "not set";
+    try {
+      host = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).host : "not set";
+    } catch { host = "unparseable"; }
+    return Response.json(
+      {
+        error: "Database not reachable.",
+        tryingToConnectTo: host,
+        checklist: [
+          "Is DATABASE_URL in Vercel the Mumbai string (host should contain ap-south-1)?",
+          "Did you REDEPLOY after saving the env var? (changes need a fresh deploy)",
+          "Is the Supabase project fully active/healthy (not still provisioning)?",
+        ],
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
   }
 
   // Provision each independently so one failure can't block the others.
